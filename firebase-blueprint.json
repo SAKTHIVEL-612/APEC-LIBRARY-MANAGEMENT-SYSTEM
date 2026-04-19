@@ -1,0 +1,101 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "Represents a student, teacher, or admin (librarian).",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "The unique ID from Firebase Auth." },
+        "name": { "type": "string", "description": "The full name of the user." },
+        "email": { "type": "string", "format": "email", "description": "The email address of the user." },
+        "role": { "type": "string", "enum": ["admin", "student", "teacher"], "description": "The role of the user." },
+        "isBlocked": { "type": "boolean", "description": "Whether the user is blocked from borrowing." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "When the user account was created." }
+      },
+      "required": ["uid", "name", "email", "role"]
+    },
+    "Book": {
+      "title": "Book",
+      "description": "Represents a book in the library.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "description": "The title of the book." },
+        "author": { "type": "string", "description": "The author of the book." },
+        "isbn": { "type": "string", "description": "The ISBN of the book." },
+        "category": { "type": "string", "description": "The category of the book." },
+        "publisher": { "type": "string", "description": "The publisher of the book." },
+        "quantityTotal": { "type": "integer", "description": "Total quantity in the library." },
+        "quantityAvailable": { "type": "integer", "description": "Quantity currently available for issue." },
+        "shelfLocation": { "type": "string", "description": "The shelf location of the book." },
+        "description": { "type": "string", "description": "A brief description of the book." },
+        "coverImage": { "type": "string", "description": "URL to the book cover image." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "When the book was added." }
+      },
+      "required": ["title", "author", "isbn", "quantityTotal", "quantityAvailable"]
+    },
+    "Request": {
+      "title": "Request",
+      "description": "Represents a book request from a student or teacher.",
+      "type": "object",
+      "properties": {
+        "userUid": { "type": "string", "description": "The UID of the user making the request." },
+        "userName": { "type": "string", "description": "The name of the user making the request." },
+        "bookTitle": { "type": "string", "description": "The title of the requested book." },
+        "bookId": { "type": "string", "description": "The ID of the book if it exists in the system." },
+        "customDescription": { "type": "string", "description": "A custom description for books not in the system." },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected", "fulfilled"], "description": "The status of the request." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "When the request was made." }
+      },
+      "required": ["userUid", "bookTitle", "status", "createdAt"]
+    },
+    "Transaction": {
+      "title": "Transaction",
+      "description": "Represents a book issue and return transaction.",
+      "type": "object",
+      "properties": {
+        "userUid": { "type": "string", "description": "The UID of the user borrowing the book." },
+        "userName": { "type": "string", "description": "The name of the user borrowing the book." },
+        "bookId": { "type": "string", "description": "The ID of the book being issued." },
+        "bookTitle": { "type": "string", "description": "The title of the book being issued." },
+        "issueDate": { "type": "string", "format": "date-time", "description": "When the book was issued." },
+        "dueDate": { "type": "string", "format": "date-time", "description": "When the book is due for return." },
+        "returnDate": { "type": "string", "format": "date-time", "description": "When the book was actually returned." },
+        "fineAmount": { "type": "number", "description": "The fine calculated for late return." },
+        "status": { "type": "string", "enum": ["issued", "returned"], "description": "The status of the transaction." }
+      },
+      "required": ["userUid", "bookId", "issueDate", "dueDate", "status"]
+    },
+    "Notification": {
+      "title": "Notification",
+      "description": "Represents a real-time notification for a user.",
+      "type": "object",
+      "properties": {
+        "userUid": { "type": "string", "description": "The UID of the user receiving the notification (or 'admin' for all admins)." },
+        "message": { "type": "string", "description": "The notification message." },
+        "type": { "type": "string", "description": "The type of notification (e.g., 'request', 'status_update', 'reminder')." },
+        "isRead": { "type": "boolean", "description": "Whether the notification has been read." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "When the notification was created." }
+      },
+      "required": ["userUid", "message", "isRead", "createdAt"]
+    },
+    "Settings": {
+      "title": "Settings",
+      "description": "Library-wide settings.",
+      "type": "object",
+      "properties": {
+        "finePerDay": { "type": "number", "description": "The fine amount per day for late returns." },
+        "maxBooksPerUser": { "type": "number", "description": "Maximum number of books a user can borrow." },
+        "loanDurationDays": { "type": "number", "description": "Default loan duration in days." }
+      },
+      "required": ["finePerDay", "maxBooksPerUser", "loanDurationDays"]
+    }
+  },
+  "firestore": {
+    "/users/{uid}": { "schema": "User", "description": "User profiles." },
+    "/books/{bookId}": { "schema": "Book", "description": "Library books." },
+    "/requests/{requestId}": { "schema": "Request", "description": "Book requests." },
+    "/transactions/{transactionId}": { "schema": "Transaction", "description": "Issue/return transactions." },
+    "/notifications/{notificationId}": { "schema": "Notification", "description": "User notifications." },
+    "/settings/config": { "schema": "Settings", "description": "Global settings." }
+  }
+}

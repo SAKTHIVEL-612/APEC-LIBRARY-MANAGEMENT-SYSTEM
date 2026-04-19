@@ -1,0 +1,180 @@
+// ===============================================================
+// Assumed Data Model
+// ===============================================================
+//
+// Collection: users
+// Document ID: {uid}
+// Fields:
+//   - uid: string (required)
+//   - name: string (required)
+//   - email: string (required, email format)
+//   - role: string (required, enum: admin, student, teacher)
+//   - isBlocked: boolean
+//   - createdAt: timestamp
+//
+// Collection: books
+// Document ID: {bookId}
+// Fields:
+//   - title: string (required)
+//   - author: string (required)
+//   - isbn: string (required)
+//   - category: string
+//   - publisher: string
+//   - quantityTotal: number (required)
+//   - quantityAvailable: number (required)
+//   - shelfLocation: string
+//   - description: string
+//   - coverImage: string
+//   - createdAt: timestamp
+//
+// Collection: requests
+// Document ID: {requestId}
+// Fields:
+//   - userUid: string (required)
+//   - userName: string
+//   - bookTitle: string (required)
+//   - bookId: string
+//   - customDescription: string
+//   - status: string (required, enum: pending, approved, rejected, fulfilled)
+//   - createdAt: timestamp
+//
+// Collection: transactions
+// Document ID: {transactionId}
+// Fields:
+//   - userUid: string (required)
+//   - userName: string
+//   - bookId: string (required)
+//   - bookTitle: string
+//   - issueDate: timestamp (required)
+//   - dueDate: timestamp (required)
+//   - returnDate: timestamp
+//   - fineAmount: number
+//   - status: string (required, enum: issued, returned)
+//
+// Collection: notifications
+// Document ID: {notificationId}
+// Fields:
+//   - userUid: string (required, or 'admin')
+//   - message: string (required)
+//   - type: string
+//   - isRead: boolean (required)
+//   - createdAt: timestamp
+//
+// Collection: settings
+// Document ID: config
+// Fields:
+//   - finePerDay: number (required)
+//   - maxBooksPerUser: number (required)
+//   - loanDurationDays: number (required)
+//
+// ===============================================================
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    function isAdmin() {
+      return isAuthenticated() && 
+        ((exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin') ||
+         (request.auth.token.email == "admin@college.edu"));
+    }
+
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    function isValidUser(data) {
+      return data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+             isValidEmail(data.email) &&
+             data.role in ['admin', 'student', 'teacher'];
+    }
+
+    function isValidBook(data) {
+      return data.title is string && data.title.size() > 0 && data.title.size() < 200 &&
+             data.author is string && data.author.size() > 0 && data.author.size() < 100 &&
+             data.isbn is string && data.isbn.size() < 20 &&
+             data.quantityTotal is number && data.quantityTotal >= 0 &&
+             data.quantityAvailable is number && data.quantityAvailable >= 0;
+    }
+
+    function isValidRequest(data) {
+      return data.userUid is string &&
+             data.bookTitle is string && data.bookTitle.size() > 0 && data.bookTitle.size() < 200 &&
+             data.status in ['pending', 'approved', 'rejected', 'fulfilled'];
+    }
+
+    function isValidTransaction(data) {
+      return data.userUid is string &&
+             data.bookId is string &&
+             data.status in ['issued', 'returned'];
+    }
+
+    function isValidNotification(data) {
+      return data.userUid is string &&
+             data.message is string && data.message.size() > 0 && data.message.size() < 500 &&
+             data.isRead is bool;
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      allow read: if isAuthenticated() && (isOwner(userId) || isAdmin());
+      allow create: if isAuthenticated() && (isOwner(userId) || isAdmin()) && isValidUser(request.resource.data) && (request.resource.data.role != 'admin' || isAdmin());
+      allow update: if isAdmin() || (isOwner(userId) && request.resource.data.role == resource.data.role && isValidUser(request.resource.data));
+      allow delete: if isAdmin();
+    }
+
+    match /books/{bookId} {
+      allow read: if isAuthenticated();
+      allow create: if isAdmin() && isValidBook(request.resource.data);
+      allow update: if isAdmin() && isValidBook(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /requests/{requestId} {
+      allow read: if isAdmin() || (isAuthenticated() && resource.data.userUid == request.auth.uid);
+      allow create: if isAuthenticated() && request.resource.data.userUid == request.auth.uid && isValidRequest(request.resource.data);
+      allow update: if isAdmin() && isValidRequest(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /transactions/{transactionId} {
+      allow read: if isAdmin() || (isAuthenticated() && resource.data.userUid == request.auth.uid);
+      allow write: if isAdmin() && isValidTransaction(request.resource.data);
+    }
+
+    match /notifications/{notificationId} {
+      allow read: if isAuthenticated() && (resource.data.userUid == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated() && isValidNotification(request.resource.data);
+      allow update: if isAuthenticated() && (resource.data.userUid == request.auth.uid || isAdmin()) && isValidNotification(request.resource.data);
+      allow delete: if isAdmin() || (isAuthenticated() && resource.data.userUid == request.auth.uid);
+    }
+
+    match /settings/config {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+  }
+}

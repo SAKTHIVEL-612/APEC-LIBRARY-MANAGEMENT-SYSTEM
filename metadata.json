@@ -1,0 +1,5 @@
+{
+  "name": "APEC Library - College Library Management System",
+  "description": "A comprehensive library management system for colleges featuring role-based access, real-time notifications, book requests, and fine management.",
+  "requestFramePermissions": []
+}
